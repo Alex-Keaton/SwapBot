@@ -30,22 +30,9 @@ def get_prev_ids():
 
 # Method for giving credit to users when they do a trade.
 # Returns True if credit was given, False otherwise
-def give_credit(author1, author2, sub, swap_data, post_id):
+def update_database(author1, author2, swap_data, post_id):
 	author1 = str(author1).lower()  # Create strings of the user names for keys and values
 	author2 = str(author2).lower()
-
-	# Loop over each author and change their flair
-	for author in [author1, author2]:
-		flairs = reddit.subreddit(subreddit_name).flair(limit=None)
-		for flair in flairs:  # This is stupid but it's the only way I can figure to get a specific user's flair, so here we are
-			if not flair['user'].name.lower() == author:
-				continue
-			try:  # once we found the user in question, get their old flair css, add 1, and convert back to a string
-				css = str(1+int(flair['flair_css_class']))
-			except:  # If they have no flair, default them to 1
-				css = "1"
-		# And tthen update their flair
-		reddit.subreddit(subreddit_name).flair.set(author, flair['flair_text'], css)
 
 	# Default generic value for swaps
 	message = " - https://www.reddit.com/r/" + subreddit_name + "/comments/" + post_id
@@ -62,6 +49,23 @@ def give_credit(author1, author2, sub, swap_data, post_id):
 			return False
                 swap_data[author2].append(author1 + message)
 	return True  # If all went well, return true
+
+def update_flair(author1, author2, sub, swap_data):
+	author1 = str(author1).lower()  # Create strings of the user names for keys and values
+	author2 = str(author2).lower()
+
+	flairs = reddit.subreddit(subreddit_name).flair(limit=None)
+	# Loop over each author and change their flair
+	for author in [author1, author2]:
+		for flair in flairs:  # This is stupid but it's the only way I can figure to get a specific user's flair, so here we are
+			if not flair['user'].name.lower() == author:
+				continue
+			try:  # once we found the user in question, get their old flair css, add 1, and convert back to a string
+				css = str(len(swap_data[author]))
+			except:  # If they have no flair, default them to 1
+				css = "1"
+		# And tthen update their flair
+		reddit.subreddit(subreddit_name).flair.set(author, flair['flair_text'], css)
 
 def dump(to_write):
 	f = open(FNAME_comments, "w")
@@ -163,10 +167,10 @@ for comment in comments:
 		break
 	if author2:  # If we found any correct looking comments
 		if OP in [author1, author2]:  # make sure at least one of them is the OP for the post
-			credit_give = give_credit(author1, author2, sub, swap_data, comment.parent().id)
+			credit_give = update_database(author1, author2, swap_data, comment.parent().id)
 			if credit_give:
 				correct_reply.reply("Added")
-				pass
+				update_flair(author1, author2, sub, swap_data)
 			else:
 				correct_reply.reply("You already got credit for this trade. Please contact the moderators if you think this is an error.")
 	else:  # If we found no correct looking comments, let's come back to it later
