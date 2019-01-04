@@ -136,7 +136,10 @@ for comment in comments:
 	comment.refresh()  # Don't know why this is required but it doesnt work without it so dont touch it
 	time_made = comment.created
 	if time.time() - time_made > 3 * 24 * 60 * 60:  # if this comment is more than three days old
-		comment.reply("This comment has been around for more than 3 days without a response and will no longer be tracked. If you wish to continue tracking, please make a new top level comment tagging both this bot and the person you traded with. Thanks!")
+		try:
+			comment.reply("This comment has been around for more than 3 days without a response and will no longer be tracked. If you wish to continue tracking, please make a new top level comment tagging both this bot and the person you traded with. Thanks!")
+		except Exception as e:
+			print(e)  # comment was probably deleted
 		continue  # don't do anything to it, and don't add it to check later (let it finally drop off)
 	OP = comment.parent().author  # Get the OP of the post (because one of the users in the comment chain must be the OP)
 	author1 = comment.author  # Author of the top level comment
@@ -150,7 +153,10 @@ for comment in comments:
 			break
 	if not desired_author2_string:
 		print("Unable to find a username in " + str(comment_word_list) + " for post " + comment.parent().id)
-		comment.reply("You did not tag anyone other than this bot in your comment. Please post a new top level comment tagging this bot and the person you traded with to get credit for the trade.")
+		try:
+			comment.reply("You did not tag anyone other than this bot in your comment. Please post a new top level comment tagging this bot and the person you traded with to get credit for the trade.")
+		except Exception as e:  # Comment was probably deleted
+			print(e)
 		continue
 	author2 = ""  # Set to null for now so we can see if we were successful in finding any children comments
 	correct_reply = None
@@ -169,10 +175,16 @@ for comment in comments:
 		if OP in [author1, author2]:  # make sure at least one of them is the OP for the post
 			credit_give = update_database(author1, author2, swap_data, comment.parent().id)
 			if credit_give:
-				correct_reply.reply("Added")
+				try:
+					correct_reply.reply("Added")
+				except Exception as e:  # Comment was orobably deleted
+					print(e)
 				update_flair(author1, author2, sub, swap_data)
 			else:
-				correct_reply.reply("You already got credit for this trade. Please contact the moderators if you think this is an error.")
+				try:
+					correct_reply.reply("You already got credit for this trade. Please contact the moderators if you think this is an error.")
+				except Exception as e:  # Comment was probably deleted
+					print(e)
 	else:  # If we found no correct looking comments, let's come back to it later
 		to_write.append(str(comment.id))
 
