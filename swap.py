@@ -158,7 +158,7 @@ for comment in comments:
 		try:
 			comment.reply("You did not tag anyone other than this bot in your comment. Please post a new top level comment tagging this bot and the person you traded with to get credit for the trade.")
 		except Exception as e:  # Comment was probably deleted
-			print("\n\n" + str(time.time()) + "\n" + e)
+			print("\n\n" + str(time.time()) + "\n" + str(e))
 		continue
 	author2 = ""  # Set to null for now so we can see if we were successful in finding any children comments
 	correct_reply = None
@@ -180,13 +180,13 @@ for comment in comments:
 				try:
 					correct_reply.reply("Added")
 				except Exception as e:  # Comment was orobably deleted
-					print("\n\n" + str(time.time()) + "\n" + e)
+					print("\n\n" + str(time.time()) + "\n" + str(e))
 				update_flair(author1, author2, sub, swap_data)
 			else:
 				try:
 					correct_reply.reply("You already got credit for this trade. Please contact the moderators if you think this is an error.")
 				except Exception as e:  # Comment was probably deleted
-					print("\n\n" + str(time.time()) + "\n" + e)
+					print("\n\n" + str(time.time()) + "\n" + str(e))
 	else:  # If we found no correct looking comments, let's come back to it later
 		to_write.append(str(comment.id))
 
