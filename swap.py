@@ -58,16 +58,15 @@ def update_flair(author1, author2, sub, swap_data):
 	flairs = reddit.subreddit(subreddit_name).flair(limit=None)
 	# Loop over each author and change their flair
 	for author in [author1, author2]:
-		for flair in flairs:  # This is stupid but it's the only way I can figure to get a specific user's flair, so here we are
-			if not flair['user'].name.lower() == author:
-				continue
-			try:  # once we found the user in question, get their old flair css, add 1, and convert back to a string
-				css = str(len(swap_data[author]))
-			except:  # If they have no flair, default them to 1
-				css = "1"
-		# And tthen update their flair
-		reddit.subreddit(subreddit_name).flair.set(author, flair['flair_text'], css)
-
+		print("attempting to assign flair for " + author)
+		css = str(len(swap_data[author]))
+		if not debug:
+			reddit.subreddit(subreddit_name).flair.set(author, "", css)
+		else:
+			print("Assigning flair " + css + " to user " + author)
+			print("length of swap_data: " + str(len(swap_data[author])))
+			print(swap_data[author])
+			print("==========")
 def dump(to_write):
 	f = open(FNAME_comments, "w")
 	f.write("\n".join(to_write))
@@ -135,7 +134,11 @@ comments = list(set(comments))  # Dedupe just in case we get duplicates from the
 
 # Process comments
 for comment in comments:
-	comment.refresh()  # Don't know why this is required but it doesnt work without it so dont touch it
+	try:
+		comment.refresh()  # Don't know why this is required but it doesnt work without it so dont touch it
+	except:
+		print("Could not 'refresh' comment: " + str(comment))
+		continue
 	time_made = comment.created
 	if time.time() - time_made > 3 * 24 * 60 * 60:  # if this comment is more than three days old
 		try:
@@ -148,7 +151,7 @@ for comment in comments:
 		continue  # don't do anything to it, and don't add it to check later (let it finally drop off)
 	OP = comment.parent().author  # Get the OP of the post (because one of the users in the comment chain must be the OP)
 	author1 = comment.author  # Author of the top level comment
-	comment_word_list = [str(x) for x in comment.body.lower().replace("\n", " ").split(" ")]  # all words in the top level comment
+	comment_word_list = [str(x) for x in comment.body.lower().replace("\n", " ").replace("\r", " ").split(" ")]  # all words in the top level comment
 	desired_author2_string = ""
 	for word in comment_word_list:  # We try to find the person being tagged in the top level comment
 		if "u/" in word and bot_username.lower() not in word:
@@ -209,7 +212,7 @@ if not debug:
 
 # This is for if anyone sends us a message requesting swap data
 for message in messages:
-	text = (message.body + " " +  message.subject).replace("\n", " ").split(" ")  # get each unique word
+	text = (message.body + " " +  message.subject).replace("\n", " ").replace("\r", " ").split(" ")  # get each unique word
 	username = ""  # This will hold the username in question
 	for word in text:
 		if 'u/' in word.lower():  # if we have a username
@@ -240,6 +243,7 @@ for message in messages:
 
 	if legacy_count > 0:
 		final_text = "* " + str(legacy_count) + " Legacy Trades (trade done before this bot was created)\n\n" + final_text
+
 	if len(trades) == 0:
 		if not debug:
 			message.reply("Hello,\n\nu/" + username + " has not had any swaps yet.")
