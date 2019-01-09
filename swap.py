@@ -6,6 +6,7 @@ import time
 subreddit_name = 'funkoswap'
 FNAME_comments = 'database/active_comments-' + subreddit_name + '.txt'
 FNAME_swaps = 'database/swaps-' + subreddit_name + ".json"
+debug = False
 
 f = open("config.txt", "r")
 info = f.read().splitlines()
@@ -120,7 +121,8 @@ for comment_id in ids:
 
 # Get comments from username mentions
 for message in reddit.inbox.unread():
-	message.mark_read()
+	if not debug:
+		message.mark_read()
 	if message.was_comment and message.subject == "username mention":
 		try:
 			comments.append(reddit.comment(message.id))
@@ -137,7 +139,10 @@ for comment in comments:
 	time_made = comment.created
 	if time.time() - time_made > 3 * 24 * 60 * 60:  # if this comment is more than three days old
 		try:
-			comment.reply("This comment has been around for more than 3 days without a response and will no longer be tracked. If you wish to continue tracking, please make a new top level comment tagging both this bot and the person you traded with. Thanks!")
+			if not debug:
+				comment.reply("This comment has been around for more than 3 days without a response and will no longer be tracked. If you wish to continue tracking, please make a new top level comment tagging both this bot and the person you traded with. Thanks!")
+			else:
+				print("This comment has been around for more than 3 days without a response and will no longer be tracked. If you wish to continue tracking, please make a new top level comment tagging both this bot and the person you traded with. Thanks!" + "\n==========")
 		except Exception as e:
 			print("\n\n" + str(time.time()) + "\n" + str(e))  # comment was probably deleted
 		continue  # don't do anything to it, and don't add it to check later (let it finally drop off)
@@ -156,7 +161,10 @@ for comment in comments:
 	if not desired_author2_string:
 		print("\n\n" + str(time.time()) + "\n" + "Unable to find a username in " + str(comment_word_list) + " for post " + comment.parent().id)
 		try:
-			comment.reply("You did not tag anyone other than this bot in your comment. Please post a new top level comment tagging this bot and the person you traded with to get credit for the trade.")
+			if not debug:
+				comment.reply("You did not tag anyone other than this bot in your comment. Please post a new top level comment tagging this bot and the person you traded with to get credit for the trade.")
+			else:
+				print("You did not tag anyone other than this bot in your comment. Please post a new top level comment tagging this bot and the person you traded with to get credit for the trade." + "\n==========")
 		except Exception as e:  # Comment was probably deleted
 			print("\n\n" + str(time.time()) + "\n" + str(e))
 		continue
@@ -178,20 +186,26 @@ for comment in comments:
 			credit_give = update_database(author1, author2, swap_data, comment.parent().id)
 			if credit_give:
 				try:
-					correct_reply.reply("Added")
+					if not debug:
+						correct_reply.reply("Added")
+					else:
+						print("Added" + "\n==========")
 				except Exception as e:  # Comment was orobably deleted
 					print("\n\n" + str(time.time()) + "\n" + str(e))
 				update_flair(author1, author2, sub, swap_data)
 			else:
 				try:
-					correct_reply.reply("You already got credit for this trade. Please contact the moderators if you think this is an error.")
+					if not debug:
+						correct_reply.reply("You already got credit for this trade. Please contact the moderators if you think this is an error.")
+					else:
+						print("You already got credit for this trade. Please contact the moderators if you think this is an error." + "\n==========")
 				except Exception as e:  # Comment was probably deleted
 					print("\n\n" + str(time.time()) + "\n" + str(e))
 	else:  # If we found no correct looking comments, let's come back to it later
 		to_write.append(str(comment.id))
-
-dump(to_write)  # Save off any unfinished tags
-dump_json(swap_data)  # Dump out swap data now that we have updated it as well
+if not debug:
+	dump(to_write)  # Save off any unfinished tags
+	dump_json(swap_data)  # Dump out swap data now that we have updated it as well
 
 # This is for if anyone sends us a message requesting swap data
 for message in messages:
@@ -202,13 +216,19 @@ for message in messages:
 			username = word.lower()[2:]  # Save the username and break early
 			break
 	if not username:  # If we didn't find a username, let them know and continue
-		message.reply("Hi there,\n\nYou did not specify a username to check. Please ensure that you have a user name, such as u/FreddySwapBot, in the body of the message you just sent me. Please feel free to try again. Thanks!")
+		if not debug:
+			message.reply("Hi there,\n\nYou did not specify a username to check. Please ensure that you have a user name, such as u/FreddySwapBot, in the body of the message you just sent me. Please feel free to try again. Thanks!")
+		else:
+			print("Hi there,\n\nYou did not specify a username to check. Please ensure that you have a user name, such as u/FreddySwapBot, in the body of the message you just sent me. Please feel free to try again. Thanks!" + "\n==========")
 		continue
 	final_text = ""
 	try:
 		trades = swap_data[username]
 	except:  # if that user has not done any trades, we have no info for them.
-		message.reply("Hello,\n\nu/" + username + " has not had any swaps yet.")
+		if not debug:
+			message.reply("Hello,\n\nu/" + username + " has not had any swaps yet.")
+		else:
+			print("Hello,\n\nu/" + username + " has not had any swaps yet." + "\n==========")
 		continue
 
 	legacy_count = 0  # Use this to track the number of legacy swaps someone has
@@ -220,6 +240,13 @@ for message in messages:
 
 	if legacy_count > 0:
 		final_text = "* " + str(legacy_count) + " Legacy Trades (trade done before this bot was created)\n\n" + final_text
-
-	message.reply("Hello,\n\nu/" + username + " has had the following " + str(len(trades)) + " swaps:\n\n" + final_text)
-
+	if len(trades) == 0:
+		if not debug:
+			message.reply("Hello,\n\nu/" + username + " has not had any swaps yet.")
+                else:
+                        print("Hello,\n\nu/" + username + " has not had any swaps yet." + "\n==========")
+	else:
+		if not debug:
+			message.reply("Hello,\n\nu/" + username + " has had the following " + str(len(trades)) + " swaps:\n\n" + final_text)
+		else:
+			print("Hello,\n\nu/" + username + " has had the following " + str(len(trades)) + " swaps:\n\n" + final_text + "\n==========")
