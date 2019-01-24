@@ -76,13 +76,13 @@ def update_flair(author1, author2, sub, swap_data):
 	author1 = str(author1).lower()  # Create strings of the user names for keys and values
 	author2 = str(author2).lower()
 
-	flairs = reddit.subreddit(subreddit_name).flair(limit=None)
+	flairs = sub.flair(limit=None)
 	# Loop over each author and change their flair
 	for author in [author1, author2]:
 		print("attempting to assign flair for " + author)
 		css = str(len(swap_data[author]))
 		if not debug:
-			reddit.subreddit(subreddit_name).flair.set(author, "", css)
+			sub.flair.set(author, "", css)
 		else:
 			print("Assigning flair " + css + " to user " + author)
 			print("length of swap_data: " + str(len(swap_data[author])))
