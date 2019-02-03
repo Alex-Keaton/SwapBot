@@ -6,6 +6,7 @@ import time
 subreddit_name = 'funkoswap'
 FNAME_comments = 'database/active_comments-' + subreddit_name + '.txt'
 FNAME_swaps = 'database/swaps-' + subreddit_name + ".json"
+FNAME_archive = 'database/archive-' + subreddit_name + '.txt'
 debug = False
 
 f = open("config.txt", "r")
@@ -38,6 +39,12 @@ def get_swap_data():
 def dump(to_write):
 	f = open(FNAME_comments, "w")
 	f.write("\n".join(to_write))
+	f.close()
+
+# Dump the archived comments
+def dump_archive(archive):
+	f = open(FNAME_archive, 'a')
+	f.write("\n".join(archive) + "\n")
 	f.close()
 
 # Writes the json local file... dont touch this.
@@ -98,6 +105,7 @@ def main():
 	to_write = []  # What we will eventually write out to the local file
 	comments = []  # Stores comments from both sources of Ids
 	messages = []  # Want to catch everything else for replying
+	archive = [] # For comments that are more than 3 days old (to be checked later)
 
 	# Get comments from locally saved ids
 	for comment_id in ids:
@@ -131,12 +139,13 @@ def main():
 		if time.time() - time_made > 3 * 24 * 60 * 60:  # if this comment is more than three days old
 			try:
 				if not debug:
-					comment.reply("This comment has been around for more than 3 days without a response and will no longer be tracked. If you wish to continue tracking, please make a new top level comment tagging both this bot and the person you traded with. Thanks!")
+					comment.reply("This comment has been around for more than 3 days without a response. The bot will still track this comment but it will only check it once a day. This means that if your trade partner replies, it will be picked up for credit at most 24 hours later. So if your partner replies, please wait 24 hours before contacting the mods with any issues.\n\nIf you are seeing this comment but your partner has already replied, please contact the mods for assistance.")
+					archive.append(comment)
 				else:
-					print("This comment has been around for more than 3 days without a response and will no longer be tracked. If you wish to continue tracking, please make a new top level comment tagging both this bot and the person you traded with. Thanks!" + "\n==========")
+					print("This comment has been around for more than 3 days without a response. The bot will still track this comment but it will only check it once a day. This means that if your trade partner replies, it will be picked up for credit at most 24 hours later. So if your partner replies, please wait 24 hours before contacting the mods with any issues.\n\nIf you are seeing this comment but your partner has already replied, please contact the mods for assistance.")
 			except Exception as e:
 				print("\n\n" + str(time.time()) + "\n" + str(e))  # comment was probably deleted
-			continue  # don't do anything to it, and don't add it to check later (let it finally drop off)
+			continue  # let these comments accumulate in the archive list and dump them at the end of the loop
 		OP = comment.parent().author  # Get the OP of the post (because one of the users in the comment chain must be the OP)
 		author1 = comment.author  # Author of the top level comment
 		comment_word_list = [str(x) for x in comment.body.lower().replace("\n", " ").replace("\r", " ").split(" ")]  # all words in the top level comment
@@ -197,6 +206,8 @@ def main():
 	if not debug:
 		dump(to_write)  # Save off any unfinished tags
 		dump_json(swap_data)  # Dump out swap data now that we have updated it as well
+		if len(archive) > 0: # If we have comments to archive, dump them off
+			dump_archive(archive)
 
 	# This is for if anyone sends us a message requesting swap data
 	for message in messages:
