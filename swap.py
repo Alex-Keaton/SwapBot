@@ -2,6 +2,7 @@ import re
 import json
 import praw
 import time
+import datetime
 
 subreddit_name = 'funkoswap'
 FNAME_comments = 'database/active_comments-' + subreddit_name + '.txt'
@@ -18,8 +19,24 @@ client_secret = info[1]
 bot_username = info[2]
 bot_password = info[3]
 
+check_time = datetime.datetime.utcnow().time()
+
+def is_time_between(begin_time, end_time):
+    # If check time is not given, default to current UTC time
+    if begin_time < end_time:
+        return check_time >= begin_time and check_time <= end_time
+    else: # crosses midnight
+        return check_time >= begin_time or check_time <= end_time
+
+# Gets the previously seen comments to check again
 def get_prev_ids():
 	f = open(FNAME_comments, "r")
+	ids = f.read().splitlines()
+	f.close()
+	return ids
+
+def get_archived_ids():
+	f = open(FNAME_archive, "r")
 	ids = f.read().splitlines()
 	f.close()
 	return ids
@@ -42,9 +59,14 @@ def dump(to_write):
 	f.close()
 
 # Dump the archived comments
-def dump_archive(archive):
+def add_to_archive(archive):
 	f = open(FNAME_archive, 'a')
 	f.write("\n".join(archive) + "\n")
+	f.close()
+
+def dump_archive(archive):
+	f = open(FNAME_archive, "w")
+	f.write("\n".join(archive))
 	f.close()
 
 # Writes the json local file... dont touch this.
@@ -96,37 +118,134 @@ def update_flair(author1, author2, sub, swap_data):
 			print(swap_data[author])
 			print("==========")
 
+def set_active_comments_and_messages(reddit, comments, messages):
+	ids = get_prev_ids()  # Ids of previously seen comments that have not been finished
+	# Get comments from locally saved ids
+        for comment_id in ids:
+                try:
+                        comments.append(reddit.comment(comment_id))
+                except:  # If we fail, the user deleted their comment or account, so skip
+                        pass
+
+        # Get comments from username mentions
+        for message in reddit.inbox.unread():
+                if not debug:
+                        message.mark_read()
+                if message.was_comment and message.subject == "username mention":
+                        try:
+                                comments.append(reddit.comment(message.id))
+                        except:  # if this fails, the user deleted their account or comment so skip it
+                                pass
+                else:
+                        messages.append(message)
+
+        comments = list(set(comments))  # Dedupe just in case we get duplicates from the two sources
+
+def set_archived_comments(reddit, comments):
+	ids = get_archived_ids()
+	for comment_id in ids:
+                try:
+                        comments.append(reddit.comment(comment_id))
+                except:  # If we fail, the user deleted their comment or account, so skip
+                        pass
+	comments = list(set(comments))
+
+def handle_comment(comment, bot_username, swap_data, sub, to_write):
+	OP = comment.parent().author  # Get the OP of the post (because one of the users in the comment chain must be the OP)
+        author1 = comment.author  # Author of the top level comment
+        comment_word_list = [x.encode('utf-8').strip() for x in comment.body.lower().replace("\n", " ").replace("\r", " ").split(" ")]  # all words in the top level comment
+        desired_author2_string = get_desired_author2_name(comment_word_list, bot_username)
+        if not desired_author2_string:
+                handle_no_author2(comment_word_list, comment)
+                return
+        correct_reply = find_correct_reply(comment, author1, desired_author2_string)
+        if correct_reply:
+                author2 = correct_reply.author
+        else:
+                author2 = ""
+        if author2:  # If we found any correct looking comments
+                if OP in [author1, author2]:  # make sure at least one of them is the OP for the post
+                        credit_give = update_database(author1, author2, swap_data, comment.parent().id)
+                        if credit_give:
+                                inform_giving_credit(correct_reply)
+                                update_flair(author1, author2, sub, swap_data)
+                        else:
+                                inform_credit_already_give(correct_reply)
+        else:  # If we found no correct looking comments, let's come back to it later
+                to_write.append(str(comment.id))
+
+def get_desired_author2_name(comment_word_list, bot_username):
+	for word in comment_word_list:  # We try to find the person being tagged in the top level comment
+		if "u/" in word and bot_username.lower() not in word:
+			desired_author2_string = word
+			if desired_author2_string[0] == "/":  # Sometimes people like to add a / to the u/username
+				desired_author2_string = desired_author2_string[1:]
+			if desired_author2_string[-1] == ".":
+				desired_author2_string = desired_author2_string[:-1]
+			return desired_author2_string
+	return ""
+
+def handle_no_author2(comment_word_list, comment):
+	print("\n\n" + str(time.time()) + "\n" + "Unable to find a username in " + str(comment_word_list) + " for post " + comment.parent().id)
+	try:
+		if not debug:
+			comment.reply("You did not tag anyone other than this bot in your comment. Please post a new top level comment tagging this bot and the person you traded with to get credit for the trade.")
+		else:
+				print("You did not tag anyone other than this bot in your comment. Please post a new top level comment tagging this bot and the person you traded with to get credit for the trade." + "\n==========")
+	except Exception as e:  # Comment was probably deleted
+		print("\n\n" + str(time.time()) + "\n" + str(e))
+
+def find_correct_reply(comment, author1, desired_author2_string):
+	for reply in comment.replies.list():
+		if not 'confirm' in reply.body.lower():  # if a reply does not say confirm, skip it
+			continue
+		potential_author2_string = "u/"+str(reply.author).lower()
+		if not potential_author2_string == desired_author2_string:
+			continue
+                if str(author1).lower() == potential_author2_string:  # They can't get credit for swapping with themselves
+                        continue
+                return reply
+	return None
+
+def inform_comment_archived(comment, to_archive):
+	try:
+		if not debug:
+			comment.reply("This comment has been around for more than 3 days without a response. The bot will still track this comment but it will only check it once a day. This means that if your trade partner replies to your comment, it will take up to 24 hours before your comment is confirmed. Please wait that long before messaging the mods for help. If you are getting this message but your partner has already confirmed, please message the mods for assistance.")
+			to_archive.append(comment)
+		else:
+			print("This comment has been around for more than 3 days without a response. The bot will still track this comment but it will only check it once a day. This means that if your trade partner replies to your comment, it will take up to 24 hours before your comment is confirmed. Please wait that long before messaging the mods for help. If you are getting this message but your partner has already confirmed, please message the mods for assistance.")
+	except Exception as e:
+		print("\n\n" + str(time.time()) + "\n" + str(e))  # comment was probably deleted
+
+
+def inform_giving_credit(correct_reply):
+	try:
+		if not debug:
+			correct_reply.reply("Added")
+		else:
+			print("Added" + "\n==========")
+	except Exception as e:  # Comment was porobably deleted
+		print("\n\n" + str(time.time()) + "\n" + str(e))
+
+def inform_credit_already_give(correct_reply):
+	try:
+		if not debug:
+			correct_reply.reply("You already got credit for this trade. Please contact the moderators if you think this is an error.")
+		else:
+			print("You already got credit for this trade. Please contact the moderators if you think this is an error." + "\n==========")
+	except Exception as e:  # Comment was probably deleted
+		print("\n\n" + str(time.time()) + "\n" + str(e))
+
 def main():
 	reddit = praw.Reddit(client_id=client_id, client_secret=client_secret, user_agent='UserAgent', username=bot_username, password=bot_password)
 	sub = reddit.subreddit(subreddit_name)
 
 	swap_data = get_swap_data()  # Gets the swap data for all users
-	ids = get_prev_ids()  # Ids of previously seen comments that have not been finished
-	to_write = []  # What we will eventually write out to the local file
 	comments = []  # Stores comments from both sources of Ids
-	messages = []  # Want to catch everything else for replying
-	archive = [] # For comments that are more than 3 days old (to be checked later)
-
-	# Get comments from locally saved ids
-	for comment_id in ids:
-		try:
-			comments.append(reddit.comment(comment_id))
-		except:  # If we fail, the user deleted their comment or account, so skip
-			pass
-
-	# Get comments from username mentions
-	for message in reddit.inbox.unread():
-		if not debug:
-			message.mark_read()
-		if message.was_comment and message.subject == "username mention":
-			try:
-				comments.append(reddit.comment(message.id))
-			except:  # if this fails, the user deleted their account or comment so skip it
-				pass
-		else:
-			messages.append(message)
-
-	comments = list(set(comments))  # Dedupe just in case we get duplicates from the two sources
+        messages = []  # Want to catch everything else for replying
+	to_write = []  # What we will eventually write out to the local file
+	to_archive = [] # For comments that are more than 3 days old (to be checked later)
+	set_active_comments_and_messages(reddit, comments, messages)
 
 	# Process comments
 	for comment in comments:
@@ -137,77 +256,30 @@ def main():
 			continue
 		time_made = comment.created
 		if time.time() - time_made > 3 * 24 * 60 * 60:  # if this comment is more than three days old
-			try:
-				if not debug:
-					comment.reply("This comment has been around for more than 3 days without a response. The bot will still track this comment but it will only check it once a day. This means that if your trade partner replies, it will be picked up for credit at most 24 hours later. So if your partner replies, please wait 24 hours before contacting the mods with any issues.\n\nIf you are seeing this comment but your partner has already replied, please contact the mods for assistance.")
-					archive.append(comment)
-				else:
-					print("This comment has been around for more than 3 days without a response. The bot will still track this comment but it will only check it once a day. This means that if your trade partner replies, it will be picked up for credit at most 24 hours later. So if your partner replies, please wait 24 hours before contacting the mods with any issues.\n\nIf you are seeing this comment but your partner has already replied, please contact the mods for assistance.")
-			except Exception as e:
-				print("\n\n" + str(time.time()) + "\n" + str(e))  # comment was probably deleted
+			inform_comment_archived(comment, to_archive)
 			continue  # let these comments accumulate in the archive list and dump them at the end of the loop
-		OP = comment.parent().author  # Get the OP of the post (because one of the users in the comment chain must be the OP)
-		author1 = comment.author  # Author of the top level comment
-		comment_word_list = [str(x) for x in comment.body.lower().replace("\n", " ").replace("\r", " ").split(" ")]  # all words in the top level comment
-		desired_author2_string = ""
-		for word in comment_word_list:  # We try to find the person being tagged in the top level comment
-			if "u/" in word and bot_username.lower() not in word:
-				desired_author2_string = word
-				if desired_author2_string[0] == "/":  # Sometimes people like to add a / to the u/username
-					desired_author2_string = desired_author2_string[1:]
-				if desired_author2_string[-1] == ".":
-					desired_author2_string = desired_author2_string[:-1]
-				break
-		if not desired_author2_string:
-			print("\n\n" + str(time.time()) + "\n" + "Unable to find a username in " + str(comment_word_list) + " for post " + comment.parent().id)
-			try:
-				if not debug:
-					comment.reply("You did not tag anyone other than this bot in your comment. Please post a new top level comment tagging this bot and the person you traded with to get credit for the trade.")
-				else:
-					print("You did not tag anyone other than this bot in your comment. Please post a new top level comment tagging this bot and the person you traded with to get credit for the trade." + "\n==========")
-			except Exception as e:  # Comment was probably deleted
-				print("\n\n" + str(time.time()) + "\n" + str(e))
-			continue
-		author2 = ""  # Set to null for now so we can see if we were successful in finding any children comments
-		correct_reply = None
-		for reply in comment.replies.list():
-			if not 'confirmed' in reply.body.lower():  # if a reply does not say confirmed, skip it
-				continue
-			potential_author2_string = "u/"+str(reply.author).lower()
-			if not potential_author2_string == desired_author2_string:
-				continue
-			if str(author1).lower() == potential_author2_string:  # They can't get credit for swapping with themselves
-				continue
-			author2 = reply.author
-			correct_reply = reply
-			break
-		if author2:  # If we found any correct looking comments
-			if OP in [author1, author2]:  # make sure at least one of them is the OP for the post
-				credit_give = update_database(author1, author2, swap_data, comment.parent().id)
-				if credit_give:
-					try:
-						if not debug:
-							correct_reply.reply("Added")
-						else:
-							print("Added" + "\n==========")
-					except Exception as e:  # Comment was orobably deleted
-						print("\n\n" + str(time.time()) + "\n" + str(e))
-					update_flair(author1, author2, sub, swap_data)
-				else:
-					try:
-						if not debug:
-							correct_reply.reply("You already got credit for this trade. Please contact the moderators if you think this is an error.")
-						else:
-							print("You already got credit for this trade. Please contact the moderators if you think this is an error." + "\n==========")
-					except Exception as e:  # Comment was probably deleted
-						print("\n\n" + str(time.time()) + "\n" + str(e))
-		else:  # If we found no correct looking comments, let's come back to it later
-			to_write.append(str(comment.id))
+		handle_comment(comment, bot_username, swap_data, sub, to_write)
 	if not debug:
 		dump(to_write)  # Save off any unfinished tags
-		dump_json(swap_data)  # Dump out swap data now that we have updated it as well
-		if len(archive) > 0: # If we have comments to archive, dump them off
-			dump_archive(archive)
+		if len(to_archive) > 0: # If we have comments to archive, dump them off
+			add_to_archive([x.id for x in to_archive])
+
+	# If it is between 00:00 and 00:02 UTC, check the archived comments
+	if is_time_between(datetime.time(00,00), datetime.time(00,02)):
+		comments = []
+		to_write = []  # What we will eventually write out to the local file
+		set_archived_comments(reddit, comments)
+		for comment in comments:
+	                try:
+        	                comment.refresh()  # Don't know why this is required but it doesnt work without it so dont touch it
+                	except:
+                        	print("Could not 'refresh' comment: " + str(comment))
+	                        continue
+			handle_comment(comment, bot_username, swap_data, sub, to_write)
+
+	if not debug:
+		dump_archive(to_write)
+		dump_json(swap_data)
 
 	# This is for if anyone sends us a message requesting swap data
 	for message in messages:
