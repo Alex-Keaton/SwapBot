@@ -113,7 +113,7 @@ def update_flair(author1, author2, sub, swap_data):
 		print("attempting to assign flair for " + author)
 		css = str(len(swap_data[author]))
 		if not debug:
-			sub.flair.set(author, "", css)
+			sub.flair.set(author, css+" swaps", css)
 		else:
 			print("Assigning flair " + css + " to user " + author)
 			print("length of swap_data: " + str(len(swap_data[author])))
