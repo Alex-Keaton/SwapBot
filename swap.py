@@ -154,6 +154,8 @@ def handle_comment(comment, bot_username, swap_data, sub, to_write):
 	OP = comment.parent().author  # Get the OP of the post (because one of the users in the comment chain must be the OP)
         author1 = comment.author  # Author of the top level comment
         comment_word_list = [x.encode('utf-8').strip() for x in comment.body.lower().replace("\n", " ").replace("\r", " ").split(" ")]  # all words in the top level comment
+	if debug:
+		print(" ".join(comment_word_list))
         desired_author2_string = get_desired_author2_name(comment_word_list, bot_username)
         if not desired_author2_string:
                 handle_no_author2(comment_word_list, comment)
@@ -161,9 +163,9 @@ def handle_comment(comment, bot_username, swap_data, sub, to_write):
         correct_reply = find_correct_reply(comment, author1, desired_author2_string)
         if correct_reply:
                 author2 = correct_reply.author
-        else:
-                author2 = ""
-        if author2:  # If we found any correct looking comments
+		if debug:
+			print("Author1: " + author1)
+			print("Author2: " + author2)
                 if OP in [author1, author2]:  # make sure at least one of them is the OP for the post
                         credit_give = update_database(author1, author2, swap_data, comment.parent().id)
                         if credit_give:
@@ -172,6 +174,8 @@ def handle_comment(comment, bot_username, swap_data, sub, to_write):
                         else:
                                 inform_credit_already_give(correct_reply)
         else:  # If we found no correct looking comments, let's come back to it later
+		if debug:
+			print("No correct looking replies were found")
                 to_write.append(str(comment.id))
 
 def get_desired_author2_name(comment_word_list, bot_username):
@@ -211,7 +215,7 @@ def inform_comment_archived(comment, to_archive):
 	try:
 		if not debug:
 			comment.reply("This comment has been around for more than 3 days without a response. The bot will still track this comment but it will only check it once a day. This means that if your trade partner replies to your comment, it will take up to 24 hours before your comment is confirmed. Please wait that long before messaging the mods for help. If you are getting this message but your partner has already confirmed, please message the mods for assistance.")
-			to_archive.append(comment)
+			to_archive.append(comment.id)
 		else:
 			print("This comment has been around for more than 3 days without a response. The bot will still track this comment but it will only check it once a day. This means that if your trade partner replies to your comment, it will take up to 24 hours before your comment is confirmed. Please wait that long before messaging the mods for help. If you are getting this message but your partner has already confirmed, please message the mods for assistance.")
 	except Exception as e:
@@ -248,6 +252,8 @@ def main():
 	set_active_comments_and_messages(reddit, comments, messages)
 
 	# Process comments
+	if debug:
+		print("Looking through active comments...")
 	for comment in comments:
 		try:
 			comment.refresh()  # Don't know why this is required but it doesnt work without it so dont touch it
@@ -257,15 +263,17 @@ def main():
 		time_made = comment.created
 		if time.time() - time_made > 3 * 24 * 60 * 60:  # if this comment is more than three days old
 			inform_comment_archived(comment, to_archive)
-			continue  # let these comments accumulate in the archive list and dump them at the end of the loop
-		handle_comment(comment, bot_username, swap_data, sub, to_write)
+		else:
+			handle_comment(comment, bot_username, swap_data, sub, to_write)
 	if not debug:
 		dump(to_write)  # Save off any unfinished tags
 		if len(to_archive) > 0: # If we have comments to archive, dump them off
-			add_to_archive([x.id for x in to_archive])
+			add_to_archive(to_archive)
 
 	# If it is between 00:00 and 00:02 UTC, check the archived comments
-	if is_time_between(datetime.time(00,00), datetime.time(00,02)):
+	if is_time_between(datetime.time(00,00), datetime.time(00,02)) or debug:
+		if debug:
+			print("Looking through archived comments...")
 		comments = []
 		to_write = []  # What we will eventually write out to the local file
 		set_archived_comments(reddit, comments)
