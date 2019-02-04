@@ -58,15 +58,17 @@ def dump(to_write):
 	f.write("\n".join(to_write))
 	f.close()
 
-# Dump the archived comments
+# Add new comments to the archived comments
 def add_to_archive(archive):
+	prev_ids = get_archived_ids()
 	f = open(FNAME_archive, 'a')
-	f.write("\n".join(archive) + "\n")
+	f.write("\n".join(list(set(archive+prev_ids))) + "\n")
 	f.close()
 
+# Dump the entire archive list back into the file
 def dump_archive(archive):
 	f = open(FNAME_archive, "w")
-	f.write("\n".join(archive))
+	f.write("\n".join(list(set(archive))))
 	f.close()
 
 # Writes the json local file... dont touch this.
@@ -285,8 +287,10 @@ def main():
 	                        continue
 			handle_comment(comment, bot_username, swap_data, sub, to_write)
 
+		if not debug:
+			dump_archive(to_write)
+
 	if not debug:
-		dump_archive(to_write)
 		dump_json(swap_data)
 
 	# This is for if anyone sends us a message requesting swap data
