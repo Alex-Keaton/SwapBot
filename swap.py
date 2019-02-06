@@ -4,20 +4,20 @@ import praw
 import time
 import datetime
 
-subreddit_name = 'funkoswap'
-FNAME_comments = 'database/active_comments-' + subreddit_name + '.txt'
-FNAME_swaps = 'database/swaps-' + subreddit_name + ".json"
-FNAME_archive = 'database/archive-' + subreddit_name + '.txt'
 debug = False
 
 f = open("config.txt", "r")
 info = f.read().splitlines()
 f.close()
 
-client_id = info[0]
-client_secret = info[1]
-bot_username = info[2]
-bot_password = info[3]
+subreddit_name = info[0]
+client_id = info[1]
+client_secret = info[2]
+bot_username = info[3]
+bot_password = info[4]
+FNAME_comments = 'database/active_comments-' + subreddit_name + '.txt'
+FNAME_swaps = 'database/swaps-' + subreddit_name + ".json"
+FNAME_archive = 'database/archive-' + subreddit_name + '.txt'
 
 check_time = datetime.datetime.utcnow().time()
 
@@ -35,6 +35,7 @@ def get_prev_ids():
 	f.close()
 	return ids
 
+# Returns the list of archived comments to check
 def get_archived_ids():
 	f = open(FNAME_archive, "r")
 	ids = f.read().splitlines()
@@ -203,8 +204,10 @@ def handle_no_author2(comment_word_list, comment):
 
 def find_correct_reply(comment, author1, desired_author2_string):
 	for reply in comment.replies.list():
-		if not 'confirm' in reply.body.lower():  # if a reply does not say confirm, skip it
-			continue
+# Commented this out for now. Sometimes people say something other than confirmed but it has the same idea behind it
+# So as long as the person replying is the person being tagged, no reason to not give them credit, really.
+#		if not 'confirm' in reply.body.lower():  # if a reply does not say confirm, skip it
+#			continue
 		potential_author2_string = "u/"+str(reply.author).lower()
 		if not potential_author2_string == desired_author2_string:
 			continue
