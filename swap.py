@@ -21,8 +21,8 @@ FNAME_archive = 'database/archive-' + subreddit_name + '.txt'
 
 check_time = datetime.datetime.utcnow().time()
 
+# Checks if the time at script start up is between two desired times
 def is_time_between(begin_time, end_time):
-    # If check time is not given, default to current UTC time
     if begin_time < end_time:
         return check_time >= begin_time and check_time <= end_time
     else: # crosses midnight
