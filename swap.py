@@ -62,8 +62,8 @@ def dump(to_write):
 # Add new comments to the archived comments
 def add_to_archive(archive):
 	prev_ids = get_archived_ids()
-	f = open(FNAME_archive, 'a')
-	f.write("\n".join(list(set(archive+prev_ids))) + "\n")
+	f = open(FNAME_archive, 'w')
+	f.write("\n".join(list(set(archive+prev_ids))))
 	f.close()
 
 # Dump the entire archive list back into the file
