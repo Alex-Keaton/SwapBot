@@ -303,6 +303,9 @@ def main():
 			if 'u/' in word.lower():  # if we have a username
 				username = word.lower()[2:]  # Save the username and break early
 				break
+			if '/u/' in word.lower():  # Same as above but if they start with a leading /u/ instead of u/
+				username = word.lower()[3:]
+				break
 		if not username:  # If we didn't find a username, let them know and continue
 			if not debug:
 				message.reply("Hi there,\n\nYou did not specify a username to check. Please ensure that you have a user name, such as u/FreddySwapBot, in the body of the message you just sent me. Please feel free to try again. Thanks!")
