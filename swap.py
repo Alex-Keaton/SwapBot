@@ -300,11 +300,11 @@ def main():
 		text = (message.body + " " +  message.subject).replace("\n", " ").replace("\r", " ").split(" ")  # get each unique word
 		username = ""  # This will hold the username in question
 		for word in text:
-			if 'u/' in word.lower():  # if we have a username
-				username = word.lower()[2:]  # Save the username and break early
-				break
 			if '/u/' in word.lower():  # Same as above but if they start with a leading /u/ instead of u/
 				username = word.lower()[3:]
+				break
+			if 'u/' in word.lower():  # if we have a username
+				username = word.lower()[2:]  # Save the username and break early
 				break
 		if not username:  # If we didn't find a username, let them know and continue
 			if not debug:
