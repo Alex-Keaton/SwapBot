@@ -134,7 +134,7 @@ def set_active_comments_and_messages(reddit, comments, messages):
         for message in reddit.inbox.unread():
                 if not debug:
                         message.mark_read()
-                if message.was_comment and message.subject == "username mention" and (not message.author.lower() == "automoderator"):
+                if message.was_comment and message.subject == "username mention" and (not str(message.author).lower() == "automoderator"):
                         try:
                                 comments.append(reddit.comment(message.id))
                         except:  # if this fails, the user deleted their account or comment so skip it
@@ -156,10 +156,10 @@ def set_archived_comments(reddit, comments):
 def handle_comment(comment, bot_username, swap_data, sub, to_write):
 	OP = comment.parent().author  # Get the OP of the post (because one of the users in the comment chain must be the OP)
         author1 = comment.author  # Author of the top level comment
-        comment_word_list = [x.encode('utf-8').strip() for x in comment.body.lower().replace("\n", " ").replace("\r", " ").split(" ")]  # all words in the top level comment
+        comment_word_list = [x.encode('utf-8').strip() for x in comment.body.lower().replace("\n", " ").replace("\r", " ").replace("[", '').replace("]", " ").replace("(", '').replace(")", " ").replace("*", '').split(" ")]  # all words in the top level comment
 	if debug:
 		print(" ".join(comment_word_list))
-        desired_author2_string = get_desired_author2_name(comment_word_list, bot_username, bot_username, str(author1))
+        desired_author2_string = get_desired_author2_name(comment_word_list, bot_username, str(author1))
         if not desired_author2_string:
                 handle_no_author2(comment_word_list, comment)
                 return
@@ -280,7 +280,8 @@ def main():
 			add_to_archive(to_archive)
 
 	# If it is between 00:00 and 00:02 UTC, check the archived comments
-	if is_time_between(datetime.time(02,00), datetime.time(02,02)) or debug:
+#	if is_time_between(datetime.time(02,00), datetime.time(02,02)) or debug:
+	if True:
 		print("Looking through archived comments...")
 		comments = []
 		to_write = []  # What we will eventually write out to the local file
