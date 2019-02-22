@@ -156,7 +156,7 @@ def set_archived_comments(reddit, comments):
 def handle_comment(comment, bot_username, swap_data, sub, to_write):
 	OP = comment.parent().author  # Get the OP of the post (because one of the users in the comment chain must be the OP)
         author1 = comment.author  # Author of the top level comment
-        comment_word_list = [x.encode('utf-8').strip() for x in comment.body.lower().replace("\n", " ").replace("\r", " ").replace("[", '').replace("]", " ").replace("(", '').replace(")", " ").replace("*", '').split(" ")]  # all words in the top level comment
+        comment_word_list = [x.encode('utf-8').strip() for x in comment.body.lower().replace("\n", " ").replace("\r", " ").replace(".", '').replace("?", '').replace("!", '').replace("[", '').replace("]", " ").replace("(", '').replace(")", " ").replace("*", '').split(" ")]  # all words in the top level comment
 	if debug:
 		print(" ".join(comment_word_list))
         desired_author2_string = get_desired_author2_name(comment_word_list, bot_username, str(author1))
@@ -190,8 +190,6 @@ def get_desired_author2_name(comment_word_list, bot_username, author_username_st
 			desired_author2_string = word
 			if desired_author2_string[0] == "/":  # Sometimes people like to add a / to the u/username
 				desired_author2_string = desired_author2_string[1:]
-			if desired_author2_string[-1] == ".":
-				desired_author2_string = desired_author2_string[:-1]
 			if not desired_author2_string[2:] == author_username_string:
  				return desired_author2_string
 	return ""
@@ -280,8 +278,7 @@ def main():
 			add_to_archive(to_archive)
 
 	# If it is between 00:00 and 00:02 UTC, check the archived comments
-#	if is_time_between(datetime.time(02,00), datetime.time(02,02)) or debug:
-	if True:
+	if is_time_between(datetime.time(02,00), datetime.time(02,02)) or debug:
 		print("Looking through archived comments...")
 		comments = []
 		to_write = []  # What we will eventually write out to the local file
