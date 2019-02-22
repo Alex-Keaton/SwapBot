@@ -170,7 +170,10 @@ def handle_comment(comment, bot_username, swap_data, sub, to_write):
 			print("Author1: " + author1)
 			print("Author2: " + author2)
                 if OP in [author1, author2]:  # make sure at least one of them is the OP for the post
-                        credit_give = update_database(author1, author2, swap_data, comment.parent().id)
+			comment_to_check = comment
+			while comment_to_check.__class__.__name__ == "Comment":  # Ensures we actually get the id of the parent POST and not just a parent comment
+				comment_to_check = comment_to_check.parent()
+                        credit_give = update_database(author1, author2, swap_data, comment_to_check.id)
                         if credit_give:
                                 inform_giving_credit(correct_reply)
                                 update_flair(author1, author2, sub, swap_data)
