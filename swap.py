@@ -159,7 +159,7 @@ def handle_comment(comment, bot_username, swap_data, sub, to_write):
         comment_word_list = [x.encode('utf-8').strip() for x in comment.body.lower().replace("\n", " ").replace("\r", " ").split(" ")]  # all words in the top level comment
 	if debug:
 		print(" ".join(comment_word_list))
-        desired_author2_string = get_desired_author2_name(comment_word_list, bot_username)
+        desired_author2_string = get_desired_author2_name(comment_word_list, bot_username, bot_username, str(author1))
         if not desired_author2_string:
                 handle_no_author2(comment_word_list, comment)
                 return
@@ -167,8 +167,8 @@ def handle_comment(comment, bot_username, swap_data, sub, to_write):
         if correct_reply:
                 author2 = correct_reply.author
 		if debug:
-			print("Author1: " + author1)
-			print("Author2: " + author2)
+			print("Author1: " + str(author1))
+			print("Author2: " + str(author2))
                 if OP in [author1, author2]:  # make sure at least one of them is the OP for the post
 			comment_to_check = comment
 			while comment_to_check.__class__.__name__ == "Comment":  # Ensures we actually get the id of the parent POST and not just a parent comment
@@ -184,7 +184,7 @@ def handle_comment(comment, bot_username, swap_data, sub, to_write):
 			print("No correct looking replies were found")
                 to_write.append(str(comment.id))
 
-def get_desired_author2_name(comment_word_list, bot_username):
+def get_desired_author2_name(comment_word_list, bot_username, author_username_string):
 	for word in comment_word_list:  # We try to find the person being tagged in the top level comment
 		if "u/" in word and bot_username.lower() not in word:
 			desired_author2_string = word
@@ -192,7 +192,8 @@ def get_desired_author2_name(comment_word_list, bot_username):
 				desired_author2_string = desired_author2_string[1:]
 			if desired_author2_string[-1] == ".":
 				desired_author2_string = desired_author2_string[:-1]
-			return desired_author2_string
+			if not desired_author2_string[2:] == author_username_string:
+ 				return desired_author2_string
 	return ""
 
 def handle_no_author2(comment_word_list, comment):
